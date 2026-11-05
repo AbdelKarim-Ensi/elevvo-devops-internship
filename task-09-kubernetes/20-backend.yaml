@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: elevvo
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: { maxUnavailable: 0, maxSurge: 1 }
+  selector:
+    matchLabels: { app: backend }
+  template:
+    metadata:
+      labels: { app: backend, tier: api }
+    spec:
+      containers:
+        - name: api
+          image: elevvo-api:1.0          # built from task-05 and loaded into minikube
+          imagePullPolicy: Never
+          ports:
+            - containerPort: 3000
+          env:
+            - name: MONGO_USER
+              valueFrom: { secretKeyRef: { name: mongo-credentials, key: MONGO_USER } }
+            - name: MONGO_PASSWORD
+              valueFrom: { secretKeyRef: { name: mongo-credentials, key: MONGO_PASSWORD } }
+            - name: MONGO_URL
+              value: mongodb://$(MONGO_USER):$(MONGO_PASSWORD)@db:27017/?authSource=admin
+          resources:
+            requests: { cpu: 50m, memory: 64Mi }
+            limits:   { cpu: 250m, memory: 128Mi }
+          readinessProbe:
+            httpGet: { path: /health, port: 3000 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /health, port: 3000 }
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: elevvo
+spec:
+  selector: { app: backend }
+  ports:
+    - port: 3000
+      targetPort: 3000

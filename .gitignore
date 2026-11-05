@@ -1,0 +1,12 @@
+# Secrets
+.env
+*.pem
+*.key
+id_*
+!*.pub.example
+# Generated
+backups/
+*.tar.gz
+*.log
+demo_logs/
+node_modules/

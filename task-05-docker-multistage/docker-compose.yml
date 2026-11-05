@@ -1,0 +1,39 @@
+services:
+  api:
+    build: .
+    image: elevvo-api:1.0
+    ports:
+      - "3000:3000"
+    environment:
+      MONGO_URL: mongodb://${MONGO_USER}:${MONGO_PASSWORD}@db:27017/?authSource=admin
+    depends_on:
+      db:
+        condition: service_healthy
+    networks: [public, private]
+    restart: unless-stopped
+
+  db:
+    image: mongo:7
+    # No "ports:" -> MongoDB is NOT exposed to the host
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USER}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD}
+    volumes:
+      - dbdata:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [private]
+    restart: unless-stopped
+
+networks:
+  public:
+    driver: bridge
+  private:
+    driver: bridge
+    internal: true     # private bridge network: no external access
+
+volumes:
+  dbdata:
