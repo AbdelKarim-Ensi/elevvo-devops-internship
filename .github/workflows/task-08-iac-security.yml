@@ -1,0 +1,69 @@
+name: task-08-iac-security
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    paths:
+      - 'task-08-iac-security-cicd/**'
+      - '.github/workflows/task-08-iac-security.yml'
+
+env:
+  TF_DIR: task-08-iac-security-cicd/terraform/good
+
+jobs:
+  gitleaks:
+    name: Gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  checkov:
+    name: Checkov
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install "checkov>=3,<4"
+      - name: Scan IaC (échoue si un check non ignoré échoue)
+        run: checkov -d "$TF_DIR" --framework terraform --compact
+
+  terraform:
+    name: Terraform plan/apply
+    runs-on: ubuntu-latest
+    needs: [gitleaks, checkov]
+    services:
+      localstack:
+        image: localstack/localstack:3.8.1
+        ports:
+          - 4566:4566
+        env:
+          SERVICES: s3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.9.8
+      - name: Attendre LocalStack
+        run: |
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:4566/_localstack/health && break
+            sleep 2
+          done
+      - name: Init
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform init -input=false
+      - name: Plan
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform plan -input=false -out=tfplan
+      - name: Apply (uniquement sur main, après scans OK)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        working-directory: ${{ env.TF_DIR }}
+        run: terraform apply -input=false -auto-approve tfplan

@@ -12,3 +12,7 @@ demo_logs/
 node_modules/
 .env
 task-05-docker-multistage/app/node_modules
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
