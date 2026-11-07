@@ -65,3 +65,8 @@ resource "aws_s3_bucket_public_access_block" "this" {
 output "bucket_name" {
   value = aws_s3_bucket.this.id
 }
+
+resource "aws_s3_bucket" "leaky" {
+  bucket = "elevvo-task08-leaky"
+  acl    = "public-read"
+}
